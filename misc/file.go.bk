@@ -1,0 +1,14 @@
+package main
+
+import (
+	"net/http"
+)
+
+func main() {
+	dir := "/home/hh"
+	http.Handle("/", http.FileServer(http.Dir(dir)))
+	err := http.ListenAndServe(":8100",nil)
+	if err != nil {
+		panic(err)
+	}
+}

@@ -1,0 +1,87 @@
+I don't know...
+What are the ideas that have been thrown around so far?
+CQRS, persistent style data types, operational transformation
+append only log file,
+some sort of persistence through key value blob storage?
+git as your persistence engine?
+as well as being modular and performant, and you can bench it, and test it
+
+ok one thing at a time...
+model...
+
+
+api...
+what would the workflow be like?
+open a file...
+ - go to that path in the tree version
+ - read to buffer
+type ->
+ - insert to buffer
+
+clicks something ... goes to that thing
+
+
+is the scope just too big?
+well, let's do one thing at a time
+we already did one, well sort of one
+
+whats next? the blob key storage...
+
+
+
+
+
+we just need a storage engine for aof and file/tree objects
+what are our options? ppostgres? aerospike?
+sqlite? lets try sqlite, its simple and since we use sql we can
+update it in the future
+
+
+
+I dont know... see the other thing
+basically, we only want to work together when we're solving the same problem.
+now, how should we do this?the server's kinda done
+whats the model?
+bytes? just bytes?
+what do we want form the model?
+export to build systems
+read like wiki with symbol links
+edit quickly/easily
+
+thats alot of asks
+
+
+Why don't we just use gitlab? learn how the issues thing works.
+That could be a wonder, but again, remember why we're doing this:
+we want a wiki - code like editor that a team can use.
+
+lets' break that down:
+first, tracking... use git?
+I can't do this all in my head. Why can't I do this all in my head. Its all so muddy.
+
+
+
+we want ... conceptual integrity on how a project should be done. Everyone should agree on how it should be done.
+Everyone should know how it is being done.
+we want auditability. see what was done, why it was done ,when and by who.
+exposes
+
+ok what now?
+top down, bottoms up
+
+top down:
+a team project -> issue tracking, branching
+a wiki project -> so directories, projects, pages, and links
+a collaborative editor ->
+ - an editor -- autocomplete, easy click and find, cicd
+ - collaborative -- operational transforms
+
+bottoms up:
+the page is probably the most important thing:
+- a buffer data structure to view and edit.
+it has to support:
+ - viewing
+ - quick editing
+    - inserts
+    - deletes
+    - undos

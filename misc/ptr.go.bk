@@ -1,0 +1,21 @@
+package main
+
+import (
+	"fmt"
+	"unsafe"
+	"encoding/binary"
+)
+
+// ways to put a pointer into a byte array
+
+func PutPtr(ptr *int, b [8]byte){
+	ptr := uint64(uintptr(unsafe.Pointer(&a)))
+}
+
+func main(){
+	var a [8]byte
+	fmt.Printf("%p %d\n",(&a), unsafe.Sizeof(&a))
+	ptr := uint64(uintptr(unsafe.Pointer(&a)))
+	binary.LittleEndian.PutUint64(a, ptr)
+	fmt.Printf("%#x %d\n", a, len(a))
+}
