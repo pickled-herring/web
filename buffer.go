@@ -1,43 +1,3 @@
-package web
-import (
-	"fmt"
-	"io"
-	"math/rand"
-)
-
-func assert(cond bool){
-	if !cond {
-		panic("assert failed!")
-	}
-}
-// rrbt: second attempt
-// lets try to make it generic and use array instead of slice
-// because the slice header could be a bit extra everytime we
-// append
-// there's not much I can think of to improve other than
-// actually measuring performance and memory consumption
-// just do a writeup this weekend and if there's time then
-// adding tree sitter to support is fine too.
-// make it into a proper file buffer
-// common queries on file buffers: 
-/* 
- + read from line a to b
- + scroll (or get next line)
- + goto line a
- + insert at line a column b
- + delete at line a column b
- */
-
-/*
- TODO:
- add comments to make it readable
- generalize the data structure
- make it into a package with support
- write some bench tests
- write some unit tests
- see if there are any optimizations to be made.
- */
-
 /* This trie structure is the relaxed radix balanced tree, which can be
    seen as a vector that supports persistence, and fast random order
    inserts, lookup and deletes.
@@ -73,6 +33,19 @@ func assert(cond bool){
 
  OPEN: try JPB Puente's embedded implementation?
  */
+package web
+import (
+	"fmt"
+	"io"
+	"math/rand"
+)
+
+func assert(cond bool){
+	if !cond {
+		panic("assert failed!")
+	}
+}
+
 
 const (
 	b = 5
@@ -86,14 +59,6 @@ type Trie[T any] struct {
 	subsize *[m]int
 }
 
-/*
-  The Id implements the transient property. Since the Trie is persistent,
-  every change results in a copy on write. The transient property allows us
-  to change Tries in memory and they are invalid the moment some method is
-  called on the Trie. if the id of the Trie is non zero, it is transient. 
-  if a subtrie has the same id as the Trie and is non zero, it is transient 
-  and can be changed in memory instead of copied on write.
- */
 func NewTrans[T any](h, id int) *Trie[T] {
 	a := &Trie[T]{}
 	a.id = id
@@ -126,14 +91,13 @@ func (t *Trie[T])Full() bool {
 // TODO: Fix size so that it stores the amount of elements in the trie up to
 //       the subtrie
 func (t *Trie[T])Size() int {
+	if t.length == 0 {
+		return 0
+	}
 	if t.height == 0 {
 		return t.length
 	}
-	sum := 0
-	for i:=0; i<t.length; i++ {
-		sum += t.subsize[i]
-	}
-	return sum
+	return t.subsize[t.length-1]
 }
 
 func clone_array[T any](arr *[m]T, length int) *[m]T {
@@ -192,7 +156,7 @@ func (t *Trie[T])AppendSubTrie(id int, st *Trie[T]) *Trie[T] {
 	assert(n.height > 0)
 	assert(n.length < m)
 	n.subtrie[n.length] = st
-	n.subsize[n.length] = st.Size()
+	n.subsize[n.length] = t.Size() + st.Size()
 	n.length++
 	return n
 }
@@ -205,41 +169,53 @@ func NewTrieWithElement[T any](h,id int, v T) *Trie[T] {
 	return n.AppendSubTrie(id, NewTrieWithElement(h-1,id,v))
 }
 
-func (t *Trie[T])Append(v T) *Trie[T] {
+func (t *Trie[T])Append(id int, v T) *Trie[T] {
 	if t.Full() {
-		root := NewTrans[T](t.height+1,t.id)
-		return root.AppendSubTrie(t.id, t).Append(v)
+		root := NewTrans[T](t.height+1,id)
+		return root.AppendSubTrie(id, t).Append(id, v)
 	}
 	if t.height == 0 {
-		return t.AppendContent(t.id,v)
+		return t.AppendContent(id,v)
 	}
-	n := t.CloneTrans(t.id)
+	n := t.CloneTrans(id)
 	if n.subtrie[n.length-1].Full() {
-		return n.AppendSubTrie(t.id, NewTrieWithElement(n.height-1,t.id,v))
+		return n.AppendSubTrie(id, NewTrieWithElement(n.height-1,id,v))
 	}
-	n.subtrie[n.length-1] = n.subtrie[n.length-1].Append(v)
+	n.subtrie[n.length-1] = n.subtrie[n.length-1].Append(id, v)
 	n.subsize[n.length-1]++
 	return n
 }
 
 func (t *Trie[T])AppendSlice(vs []T) *Trie[T] {
 	n := t.Trans()
-	for _,v := range vs {
-		n = n.Append(v)
-	}
+	n.AppendSliceTrans(vs)
 	return n
+}
+
+func (t *Trie[T])AppendSliceTrans(vs []T) *Trie[T] {
+	for _,v := range vs {
+		t = t.Append(t.id, v)
+	}
+	return t
 }
 
 // ReadSlice only returns the slice pointing to the underlying array in the trie
 // Use this to implement io reads
 func (t *Trie[T])ReadSlice(index int) ([]T,error) {
-	i := (index >> (b*t.height)) & (m-1)
-	if i > t.length {
+	if index > t.Size() {
 		return nil, io.EOF
 	} else if t.height == 0 {
-		return t.content[i:], nil
+		return t.content[index:], nil
 	} else {
-		return t.subtrie[i].ReadSlice(index)
+		i := index>>(b*t.height)
+		for (index >= t.subsize[i]){
+			i++
+		}
+		subtrie_starts := 0
+		if i > 0 {
+			subtrie_starts = t.subsize[i-1]
+		}
+		return t.subtrie[i].ReadSlice(index-subtrie_starts)
 	}
 }
 
