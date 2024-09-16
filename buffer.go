@@ -301,7 +301,76 @@ func (t *Trie[T])Drop(id,index int) *Trie[T] {
 	}
 }
 
-/*
-func (t *Trie[T])Concat(t *Trie[T]) *Trie[T] {
+// a stateful iterator to scroll through the Trie
+type Iterator[T any] struct {
+	stack []*Trie[T] // sorted by height, stack[0] contains the trie with height 0
+	point int        // that contains the index
 }
-*/
+
+func (t *Trie[T])Iterator(starting_index int) *Iterator[T] {
+	stack := make([]*Trie[T], t.height)
+	i := &Iterator{}
+}
+
+func (i *Iterator[T])Next() {
+}
+
+func (i *Iterator[T])NextTrie(height int){
+}
+
+func (i *Iterator[T])Content() T {
+}
+
+func (i *Iterator[T])Trie() *Trie[T] {
+}
+
+// Concat has got to be the most difficult algorithm I've ever imagined.
+// I still don't get how it works... well I kinda do
+
+// we use dynamic programming to figure out our reshuffling strategy ahead of time.
+// ms: number of m size tries
+// mo: number of m-1 size tries
+// lf: number of leftover elements if reshuffling to m and m-1 is impossible.
+
+var strategy [2*m*m]struct{
+	ms, mo, lf int
+}
+
+func init() {
+	for i:=0; i<m-1; i++ {
+		strategy[i] = struct{0,0,i}
+	}
+	strategy[m-1] = struct{0,1,0}
+	strategy[m] = struct{1,0,0}
+	for i:=m+1; i<2*m*m; i++ {
+		plan_ms := strategy[i-m]
+		plan_mo := strategy[i-m+1]
+		if plan_ms.lf == 0 {
+			strategy[i] = plan_ms
+			strategy[i].ms++
+		} else if plan_mo.lf == 0 {
+			strategy[i] = plan_mo
+			strategy[i].mo++
+		} else {
+			strategy[i] = strategy[i]
+			strategy[i].lf++
+		}
+	}
+}
+
+func reshuffled_contents[T](l,r *Trie[T]) []*Trie[T]{
+	assert(l.height == 1)
+	assert(r.height == 1)
+	ms := strategy[l.Size() + r.Size()].ms
+	mo := strategy[l.Size() + r.Size()].mo
+	lf := strategy[l.Size() + r.Size()].lf
+	new_tries_len = ms + mo
+	if lf > 0 {
+		new_tries_len++
+	}
+
+	new_tries := make([]*Trie[T], new_tries_len)
+}
+
+func (l *Trie[T])Concat(r *Trie[T]) *Trie[T] {
+}
