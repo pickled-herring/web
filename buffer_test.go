@@ -3,6 +3,7 @@ package web
 import (
 	"math/rand"
 	"testing"
+	"io"
 )
 /* What properties are there with the trie?
    Persistence
@@ -15,57 +16,143 @@ import (
 
  */
 
-func TestSize(t *testing.T) {
-	a := NewTrie[int](0)
-	if a.Size() != 0 {
-		t.Fatalf("a.Size() = %d != 0", a.Size())
+// TestAppend(
+// Reads are followed what is written or appended
+
+var letters = []byte("qwertyuiopasdfghjklzxcvbnm" + 
+	"QWERTYUIOPASDFGHJKLZXCVBNM" +
+	"1234567890,.?! ")
+
+func randSeq(n int) []byte {
+	b := make([]byte, n)
+	for i := 0; i < n; i++ {
+		b[i] = letters[rand.Intn(len(letters))]
 	}
-	b := a.AppendSlice([]int{1,2,3})
-	if a.Size() != 0 {
-		t.Fatalf("a.Size() = %d != 0", a.Size())
-	}
-	if b.Size() != 3 {
-		t.Fatalf("b.Size() = %d != 3", b.Size())
-	}
+	return b
 }
 
-func TestAppendFullTrie(t *testing.T) {
-	a := NewTrans[int](0,1234)
-	for i := 0; i < 1024; i ++ {
-		a = a.Append(1234, rand.Int())
+func TestAppendTrans(t *testing.T){
+	num := 1024
+	ref := randSeq(num)
+	a := TrieFromSlice[byte](ref)
+	if a.Size() != num {
+		t.Fatalf("a.Size() = %d != %d", a.Size(), num)
 	}
-	if a.Size() != 1024{
-		t.Errorf("a.Size() = %d != 1024", a.Size())
+	if !a.Full() {
+		t.Fatalf("a.Full() is false!")
 	}
-	if a.height != 1 {
-		t.Errorf("a.height = %d != 1", a.height)
+	num2 := 500
+	ref2 := randSeq(num2)
+	a = a.AppendSliceTrans(ref2)
+	if a.Size() != num + num2 {
+		t.Fatalf("a.Size() = %d != %d", a.Size(), num + num2)
 	}
-	a = a.Append(1234, 12)
 }
 
 func TestAppend(t *testing.T){
-	a := NewTrans[byte](0,1234)
-	s := []byte("This things what else is there to know")
-	for i := 0; i < 100; i++ {
-		a = a.AppendSliceTrans(s)
+	num := 1024
+	ref := randSeq(num)
+	a := TrieFromSlice[byte](ref)
+	if a.Size() != num {
+		t.Fatalf("a.Size() = %d != %d", a.Size(), num)
 	}
-	if a.Size() != len(s) * 100 {
-		t.Errorf("a.Size() = %d != len(s)*100 = %d", a.Size(), len(s)*100)
+
+	num2 := 503
+	ref2 := randSeq(num2)
+	b := a.AppendSlice(ref2)
+	if b == a {
+		t.Fatalf("a: %p, b: %p\n", a, b)
 	}
-	for i := 0; i< 1000; i++ {
-		index := rand.Intn(len(s)*100-1)
-		read_slice,err := a.ReadSlice(index)
+	if a.Size() != num {
+		t.Fatalf("a.Size() = %d != %d", a.Size(), num)
+	}
+	if b.Size() != num + num2 {
+		t.Logf("%v\n", b.subsize)
+		t.Fatalf("b.Size() = %d != %d", b.Size(), num+num2)
+	}
+}
+
+func TestAppendRead(t *testing.T){
+	num := 1024
+	ref := randSeq(num)
+	a := TrieFromSlice[byte](ref)
+	for i := 0; i < 990; i++ {
+		r,err := a.ReadSlice(i)
 		if err != nil {
-			t.Errorf("a.ReadSlice(%d) failed with error %v", index, err)
-			return
+			t.Fatalf("a.ReadSlice(%d) returned err %v", i, err)
 		}
-		if read_slice[0] != s[index%len(s)] {
-			t.Errorf("a.ReadSlice(%d)[0] == %c in %s; expected s[%d], %c",
-				index,read_slice[0], read_slice, index%len(s), s[index%len(s)])
-			return
+		if r[0] != ref[i] {
+			t.Fatalf("a.ReadSlice(%d) = %s != %s", i, r, ref[i:i+32])
+		}
+	}
+
+	_, err := a.ReadSlice(len(ref)+1)
+	if err != io.EOF {
+		t.Fatalf("a.ReadSlice(%d) returned err %v", len(ref)+1, err)
+	}
+}
+
+func TestSize(t *testing.T){
+	a := NewTrie[byte](0)
+	if a.Size() != 0 {
+		t.Fatalf("a.Size() = %d != 0", a.Size())
+	}
+}
+
+func TestTake(t *testing.T){
+	num := 1000
+	ref := randSeq(num)
+	a := TrieFromSlice[byte](ref)
+	for i := 2; i < num-1; i++ {
+		b := a.Take(0,i)
+		if b.Size() != i {
+			t.Fatalf("a.Take(%d).Size() = %d, not %d", i, b.Size(), i)
+		}
+
+		readb, err := b.ReadSlice(i-2)
+		if err != nil {
+			t.Fatalf("a.Take(%d).ReadSlice(%d) returned err %v", 
+				i, i-2, err)
+		}
+		if readb[0] != ref[i-2] {
+			t.Fatalf("a.Take(%d).ReadSlice(%d) returned %s != %s", 
+				i, i-2, readb, ref[i-2:i])
+		}
+
+		readb, err = b.ReadSlice(0)
+		if err != nil {
+			t.Fatalf("a.Take(%d).ReadSlice(%d) returned err %v", 
+				i, 0, err)
+		}
+		if readb[0] != ref[0] {
+			t.Fatalf("a.Take(%d).ReadSlice(%d) returned %s != %s", 
+				i, 0, readb, ref[:5])
 		}
 	}
 }
+
+func TestDrop(t *testing.T) {
+	num := 1000
+	ref := randSeq(num)
+	a := TrieFromSlice[byte](ref)
+	for i := 2; i < num-1; i++ {
+		b := a.Drop(0,i)
+		if b.Size() != num-i {
+			t.Fatalf("a.Take(%d).Size() = %d, not %d", i, b.Size(), num-i)
+		}
+
+		readb, err := b.ReadSlice(0)
+		if err != nil {
+			t.Fatalf("a.Take(%d).ReadSlice(%d) returned err %v", 
+				i, 0, err)
+		}
+		if readb[0] != ref[i] {
+			t.Fatalf("a.Take(%d).ReadSlice(%d) returned %s != %s", 
+				i, 0, readb, ref[i:i+5])
+		}
+	}
+}
+
 
 func BenchmarkAppendTrans(b *testing.B){
 	a := NewTrans[byte](0,1234)
@@ -108,5 +195,13 @@ func BenchmarkReadSlice(b *testing.B){
 	}
 	for i:=0 ; i<b.N; i++ {
 		a.ReadSlice(i%(1000*len(s)))
+	}
+}
+
+func BenchmarkTake(b *testing.B){
+	num := 10000
+	a := TrieFromSlice[byte](randSeq(num))
+	for i:=0 ; i<b.N; i++ {
+		a.Take(0, rand.Intn(num))
 	}
 }

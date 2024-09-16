@@ -188,7 +188,7 @@ func (t *Trie[T])Append(id int, v T) *Trie[T] {
 
 func (t *Trie[T])AppendSlice(vs []T) *Trie[T] {
 	n := t.Trans()
-	n.AppendSliceTrans(vs)
+	n = n.AppendSliceTrans(vs)
 	return n
 }
 
@@ -197,6 +197,11 @@ func (t *Trie[T])AppendSliceTrans(vs []T) *Trie[T] {
 		t = t.Append(t.id, v)
 	}
 	return t
+}
+
+func TrieFromSlice[T any](vs []T) *Trie[T] {
+	a := NewTrans[T](0, rand.Int())
+	return a.AppendSliceTrans(vs)
 }
 
 // ReadSlice only returns the slice pointing to the underlying array in the trie
@@ -219,15 +224,84 @@ func (t *Trie[T])ReadSlice(index int) ([]T,error) {
 	}
 }
 
+func (t *Trie[T])Take(id, index int) *Trie[T] {
+	if t.height == 0 {
+		assert(index < m)
+		n := t.CloneTrans(id)
+		n.length = index
+		return n
+	}
+
+	i := index>>(b*t.height)
+	for (index >= t.subsize[i]){
+		i++
+	}
+	if i > 0 {
+		index -= t.subsize[i-1]
+	}
+	assert(i < t.length)
+
+	if i == 0 {
+		return t.subtrie[0].Take(id, index)
+	} else {
+		n := t.CloneTrans(id)
+		n.subtrie[i] = n.subtrie[i].Take(id,index)
+		n.subsize[i] = n.subsize[i-1] + n.subtrie[i].Size()
+		n.length = i+1
+		return n
+	}
+}
+
+func drop_array[T any](arr *[m]T, len_arr, len_new_arr int) *[m]T{
+	assert(len_new_arr <= len_arr)
+	assert(len_arr <= m)
+	new_arr := [m]T{}
+	for i := 0; i < len_new_arr; i++ {
+		new_arr[i] = arr[len_arr-len_new_arr + i]
+	}
+	return &new_arr
+}
+
+func subsize[T any](subtrie *[m]*Trie[T], length int) *[m]int {
+	new_subsize := [m]int{}
+	new_subsize[0] = subtrie[0].Size()
+	for i := 1; i < length; i++ {
+		new_subsize[i] = new_subsize[i-1] + subtrie[i].Size()
+	}
+	return &new_subsize
+}
+
+func (t *Trie[T])Drop(id,index int) *Trie[T] {
+	if t.height == 0 {
+		assert(index < t.length)
+		n := t.CloneTrans(id)
+		n.content = drop_array[T](n.content, n.length, n.length-index)
+		n.length = n.length - index
+		return n
+	}
+
+	i := index>>(b*t.height)
+	for (index >= t.subsize[i]){
+		i++
+	}
+	if i > 0 {
+		index -= t.subsize[i-1]
+	}
+	assert(i < t.length)
+
+	if i == t.length-1 {
+		return t.subtrie[i].Drop(id, index)
+	} else {
+		n := t.CloneTrans(id)
+		n.subtrie = drop_array[*Trie[T]](n.subtrie, n.length, n.length-i)
+		n.length = n.length-i
+		n.subtrie[0] = n.subtrie[0].Drop(id, index)
+		n.subsize = subsize[T](n.subtrie, n.length)
+		return n
+	}
+}
+
 /*
-func (t *Trie[T])Take(index int) *Trie[T] {
-}
-
-func (t *Trie[T])Drop(index int) *Trie[T] {
-}
-
 func (t *Trie[T])Concat(t *Trie[T]) *Trie[T] {
 }
 */
-
-
